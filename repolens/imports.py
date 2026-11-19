@@ -263,7 +263,7 @@ def manifest_facts(root: Path, files: set[str], manifests: list[str]) -> tuple[l
     return entries, configs, diagnostics
 
 
-def read_imports(source: str, output: Path, cache: Path) -> dict:
+def read_imports(source: str, output: Path, cache: Path, *, history_depth: int | None = None) -> dict:
     parsers = make_parsers()
     root = source_root(source, cache)
     report = scan_root(root, source, output)
@@ -307,8 +307,14 @@ def read_imports(source: str, output: Path, cache: Path) -> dict:
                 else:
                     reason = "ambiguous" if candidates else "not_resolved"
                     unresolved.append({**record, "reason": reason})
-    return {
+    facts = {
         "repo": report["repo"], "source": source, "commit": report["commit"],
         "edges": [{"id": f"imp:{index:04d}", **edge} for index, edge in enumerate(edges, 1)],
         "entry_points": entry_points, "unresolved_imports": unresolved, "diagnostics": diagnostics,
     }
+    if history_depth is not None:
+        from .history import read_history
+
+        local = Path(source).expanduser().is_dir()
+        facts["history"] = read_history(root, report["commit"]["sha"], files, history_depth, not local)
+    return facts

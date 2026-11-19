@@ -33,4 +33,13 @@ entry point and trace one important flow in five minutes.
 6. Check factual claims against the measured data.
 7. Build a single animated HTML report with React and Vite.
 
-Phase 1 is committed. Phase 2 is waiting to start.
+Phases 1 and 2 are committed. Phase 3 is in verification.
+
+To add history to the facts report, run
+`python -m repolens imports <source> --history --out facts.json`.
+The default window is 200 commits along the scanned commit's first-parent chain.
+`--history-depth N` selects a different window. A pair's strength is the share
+of commits that touched both files among commits that touched either file.
+Commits touching more than 100 scanned files are excluded from pair scoring
+and still count toward individual file totals. History supplies context for
+the report.

@@ -6,6 +6,7 @@ from pathlib import Path
 import sys
 from tempfile import gettempdir
 
+from .history import DEFAULT_DEPTH
 from .scanner import ScanError, scan
 
 
@@ -18,7 +19,13 @@ def main() -> int:
     imports_parser = commands.add_parser("imports", help="Read import connections and entry points")
     imports_parser.add_argument("source", help="GitHub URL or local folder path")
     imports_parser.add_argument("--out", type=Path, default=Path("facts.json"))
+    imports_parser.add_argument("--history", action="store_true", help="Include Git history measurements")
+    imports_parser.add_argument("--history-depth", type=int, help="Maximum first-parent commits to analyze (default: 200)")
     args = parser.parse_args()
+    if args.command == "imports" and args.history_depth is not None:
+        if args.history_depth < 1:
+            imports_parser.error("--history-depth must be a positive integer")
+        args.history = True
     output = args.out.expanduser()
     cache = Path(gettempdir()) / "repolens-cache"
 
@@ -26,7 +33,8 @@ def main() -> int:
         if args.command == "imports":
             from .imports import read_imports
 
-            report = read_imports(args.source, output, cache)
+            depth = (args.history_depth or DEFAULT_DEPTH) if args.history else None
+            report = read_imports(args.source, output, cache, history_depth=depth)
         else:
             report = scan(args.source, output, cache)
         output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -40,6 +48,11 @@ def main() -> int:
             f"{len(report['unresolved_imports'])} unresolved imports, "
             f"{len(report['entry_points'])} entry points"
         )
+        if "history" in report:
+            history = report["history"]
+            print(f"Git history: {history['status']} ({history['commits_analyzed']} commits analyzed)")
+            for diagnostic in history["diagnostics"]:
+                print(diagnostic, file=sys.stderr)
     else:
         print_scan_summary(report)
     print(f"Report saved to {output}")
