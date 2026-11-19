@@ -10,3 +10,5 @@ facts and AI explains them using evidence. Keep each phase scoped to its task.
 - In later phases, verify structured claims against measured facts and explain
   why each file is recommended. Wait for authorization before starting Phase 2.
 - Explain new files and their roles in plain language.
+
+Read PROJECT_BRIEF.md at the start of every session. It is the source of truth.
