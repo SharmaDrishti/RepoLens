@@ -6,6 +6,12 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest"]
+imports = [
+    "tree-sitter>=0.25,<0.26",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
