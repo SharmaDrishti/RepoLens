@@ -1,6 +1,6 @@
 # RepoLens
 
-Current phase: Phase 3: History reader (verification pending)
+Current phase: Phase 4: Ranker (verification pending)
 
 RepoLens helps developers understand an unfamiliar repository. Code measures
 facts and AI explains them using evidence. Keep each phase scoped to its task.

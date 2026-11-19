@@ -33,7 +33,7 @@ entry point and trace one important flow in five minutes.
 6. Check factual claims against the measured data.
 7. Build a single animated HTML report with React and Vite.
 
-Phases 1 and 2 are committed. Phase 3 is in verification.
+Phases 1 through 3 are committed. Phase 4 is in verification.
 
 To add history to the facts report, run
 `python -m repolens imports <source> --history --out facts.json`.
@@ -43,3 +43,9 @@ of commits that touched both files among commits that touched either file.
 Commits touching more than 100 scanned files are excluded from pair scoring
 and still count toward individual file totals. History supplies context for
 the report.
+
+Add `--rank` to `imports` to include a reading guide in `facts.json`.
+The guide recommends up to five files and records one path of up to four
+resolved imports from a confirmed entry point, when available. The path
+describes static import connections. Git history can add a change note to
+a recommended file without affecting its rank.

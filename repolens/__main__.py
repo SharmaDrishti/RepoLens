@@ -20,6 +20,7 @@ def main() -> int:
     imports_parser.add_argument("source", help="GitHub URL or local folder path")
     imports_parser.add_argument("--out", type=Path, default=Path("facts.json"))
     imports_parser.add_argument("--history", action="store_true", help="Include Git history measurements")
+    imports_parser.add_argument("--rank", action="store_true", help="Include a reading guide and import path")
     imports_parser.add_argument("--history-depth", type=int, help="Maximum first-parent commits to analyze (default: 200)")
     args = parser.parse_args()
     if args.command == "imports" and args.history_depth is not None:
@@ -35,6 +36,10 @@ def main() -> int:
 
             depth = (args.history_depth or DEFAULT_DEPTH) if args.history else None
             report = read_imports(args.source, output, cache, history_depth=depth)
+            if args.rank:
+                from .ranker import build_reading_guide
+
+                report["reading_guide"] = build_reading_guide(report)
         else:
             report = scan(args.source, output, cache)
         output.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -53,6 +58,9 @@ def main() -> int:
             print(f"Git history: {history['status']} ({history['commits_analyzed']} commits analyzed)")
             for diagnostic in history["diagnostics"]:
                 print(diagnostic, file=sys.stderr)
+        if "reading_guide" in report:
+            guide = report["reading_guide"]
+            print(f"Reading guide: {len(guide['recommendations'])} recommended files")
     else:
         print_scan_summary(report)
     print(f"Report saved to {output}")
