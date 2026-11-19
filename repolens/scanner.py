@@ -183,15 +183,20 @@ def inspect_file(path: Path, root: Path, output: Path) -> tuple[dict | None, str
     }, None
 
 
-def scan(source: str, output: Path, cache: Path) -> dict:
+def source_root(source: str, cache: Path) -> Path:
     local = Path(source).expanduser()
     if local.is_dir():
-        root = local.resolve()
-    elif "://" in source or source.lower().startswith(("github.com/", "git@")):
-        root = clone_github(source, cache)
-    else:
-        raise ScanError(f"Folder not found: {source}")
+        return local.resolve()
+    if "://" in source or source.lower().startswith(("github.com/", "git@")):
+        return clone_github(source, cache)
+    raise ScanError(f"Folder not found: {source}")
 
+
+def scan(source: str, output: Path, cache: Path) -> dict:
+    return scan_root(source_root(source, cache), source, output)
+
+
+def scan_root(root: Path, source: str, output: Path) -> dict:
     output = output.resolve()
     skipped = dict.fromkeys(SKIP_REASONS, 0)
     files = []

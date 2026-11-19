@@ -11,6 +11,7 @@ imports = [
     "tree-sitter-python",
     "tree-sitter-javascript",
     "tree-sitter-typescript",
+    "tomli; python_version < '3.11'",
 ]
 
 [tool.pytest.ini_options]

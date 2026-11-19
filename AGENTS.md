@@ -1,6 +1,6 @@
 # RepoLens
 
-Current phase: Phase 2: Import reader (not started)
+Current phase: Phase 2: Import reader (verification pending)
 
 RepoLens helps developers understand an unfamiliar repository. Code measures
 facts and AI explains them using evidence. Keep each phase scoped to its task.
