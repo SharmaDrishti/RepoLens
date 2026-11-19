@@ -6,6 +6,7 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest"]
+writer = ["anthropic"]
 imports = [
     "tree-sitter>=0.25,<0.26",
     "tree-sitter-python",

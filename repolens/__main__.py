@@ -22,6 +22,11 @@ def main() -> int:
     imports_parser.add_argument("--history", action="store_true", help="Include Git history measurements")
     imports_parser.add_argument("--rank", action="store_true", help="Include a reading guide and import path")
     imports_parser.add_argument("--history-depth", type=int, help="Maximum first-parent commits to analyze (default: 200)")
+    report_parser = commands.add_parser("report", help="Write and check a report from RepoLens facts")
+    report_parser.add_argument("facts", type=Path, help="Path to facts.json")
+    report_parser.add_argument("--out", type=Path, default=Path("report.json"))
+    report_parser.add_argument("--provider", choices=("claude", "gemini"), default="claude")
+    report_parser.add_argument("--model", help="Override the provider's model")
     args = parser.parse_args()
     if args.command == "imports" and args.history_depth is not None:
         if args.history_depth < 1:
@@ -31,7 +36,11 @@ def main() -> int:
     cache = Path(gettempdir()) / "repolens-cache"
 
     try:
-        if args.command == "imports":
+        if args.command == "report":
+            from .writer import write_report
+
+            report = write_report(args.facts.expanduser(), cache, args.model, provider_name=args.provider)
+        elif args.command == "imports":
             from .imports import read_imports
 
             depth = (args.history_depth or DEFAULT_DEPTH) if args.history else None
@@ -61,6 +70,9 @@ def main() -> int:
         if "reading_guide" in report:
             guide = report["reading_guide"]
             print(f"Reading guide: {len(guide['recommendations'])} recommended files")
+    elif args.command == "report":
+        print(f"Report for {report['repo']}: {len(report['claims'])} accepted claims, "
+              f"{len(report['rejected_claims'])} rejected claims")
     else:
         print_scan_summary(report)
     print(f"Report saved to {output}")

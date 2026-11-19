@@ -33,7 +33,7 @@ entry point and trace one important flow in five minutes.
 6. Check factual claims against the measured data.
 7. Build a single animated HTML report with React and Vite.
 
-Phases 1 through 3 are committed. Phase 4 is in verification.
+Phases 1 through 4 are committed. Phase 5 has been verified and is awaiting commit.
 
 To add history to the facts report, run
 `python -m repolens imports <source> --history --out facts.json`.
@@ -49,3 +49,22 @@ The guide recommends up to five files and records one path of up to four
 resolved imports from a confirmed entry point, when available. The path
 describes static import connections. Git history can add a change note to
 a recommended file without affecting its rank.
+
+To write a report, install `.[writer]`, export `ANTHROPIC_API_KEY`, and run
+`python -m repolens report facts.json --model <claude-model> --out report.json`.
+The writer receives up to 40 measured facts, with import-path and recommendation
+evidence first. The checker accepts factual wording only when it matches a
+measured fact exactly. Interpretations keep their label and attached evidence.
+Rejected claims get one retry, and the report logs rejections. The checker
+requires pinned evidence files to match the scanned commit on disk.
+
+For public-repository evaluation, Gemini is also available through the same
+checker. Export `GEMINI_API_KEY` from Google AI Studio and run
+`python -m repolens report facts.json --provider gemini --out report.json`.
+The Gemini default is `gemini-3.1-flash-lite`; use `--model` to override it.
+
+The Phase 5 live Gemini review covered itsdangerous (`672971d`), Click
+(`08b803c`), slash (`2e8a56b`), Flask (`49943b5`), and p-limit (`a8a6fbe`).
+The saved reports contained 15 factual claims and six labeled interpretations.
+The factual claims matched the cited source. These runs logged no rejections.
+Separate tests exercise invented claims and invalid evidence.

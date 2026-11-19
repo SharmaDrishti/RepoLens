@@ -1,6 +1,6 @@
 # RepoLens
 
-Current phase: Phase 4: Ranker (verification pending)
+Current phase: Phase 5: AI writer and checker (verified, commit pending)
 
 RepoLens helps developers understand an unfamiliar repository. Code measures
 facts and AI explains them using evidence. Keep each phase scoped to its task.
