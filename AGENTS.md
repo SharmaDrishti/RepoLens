@@ -1,6 +1,6 @@
 # RepoLens
 
-Current phase: Phase 5: AI writer and checker (verified, commit pending)
+Current phase: Automatic explain MVP awaiting credentialed generation and browser review
 
 RepoLens helps developers understand an unfamiliar repository. Code measures
 facts and AI explains them using evidence. Keep each phase scoped to its task.
@@ -11,4 +11,6 @@ facts and AI explains them using evidence. Keep each phase scoped to its task.
   why each file is recommended. Wait for authorization before starting the next phase.
 - Explain new files and their roles in plain language.
 
-Read PROJECT_BRIEF.md at the start of every session. It is the source of truth.
+Read the owner's RepoLens master brief and PROJECT_BRIEF.md at the start of every
+session. The master brief takes precedence. Show a plan and wait for approval
+before each implementation step.
