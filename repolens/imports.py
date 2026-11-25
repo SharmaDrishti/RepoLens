@@ -7,7 +7,10 @@ import posixpath
 import re
 from typing import NamedTuple
 
-from .scanner import ScanError, read_text, scan_root, source_root
+import subprocess
+
+from .scanner import ScanError, read_text
+from .snapshot import Snapshot, open_snapshot
 
 PYTHON_EXTENSIONS = (".py", ".pyi")
 JS_EXTENSIONS = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts")
@@ -209,7 +212,7 @@ def read_project_file(root: Path, path: str) -> str:
     return content
 
 
-def manifest_facts(root: Path, files: set[str], manifests: list[str]) -> tuple[list, dict, list]:
+def manifest_facts(snapshot: Snapshot, files: set[str], manifests: list[str]) -> tuple[list, dict, list]:
     try:
         import tomllib
     except ModuleNotFoundError:
@@ -224,13 +227,13 @@ def manifest_facts(root: Path, files: set[str], manifests: list[str]) -> tuple[l
         if name not in {"package.json", "pyproject.toml", "tsconfig.json"}:
             continue
         try:
-            text = read_project_file(root, path)
+            text = "\n".join(snapshot.lines(path))
             data = tomllib.loads(text) if name == "pyproject.toml" else (
                 parse_jsonc(text) if name == "tsconfig.json" else json.loads(text)
             )
             if not isinstance(data, dict):
                 raise ValueError("expected an object")
-        except (ScanError, ValueError) as error:
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             diagnostics.append({"path": path, "reason": str(error)})
             continue
         if name == "tsconfig.json":
@@ -245,8 +248,12 @@ def manifest_facts(root: Path, files: set[str], manifests: list[str]) -> tuple[l
             for key, value in targets:
                 if isinstance(value, str):
                     candidates = js_candidates(normalize((folder / value).as_posix()), files)
+                    key_name = key.removeprefix("bin.") if key.startswith("bin.") else key
+                    line = manifest_line(text, key_name, value)
                     entries.append({"kind": "package_json", "path": next(iter(candidates)) if len(candidates) == 1 else None,
                                     "target": value, "evidence": {"path": path, "key": key}})
+                    if line:
+                        entries[-1]["evidence"]["line"] = line
         else:
             project = data.get("project", {})
             scripts = project.get("scripts", {}) if isinstance(project, dict) else {}
@@ -260,15 +267,61 @@ def manifest_facts(root: Path, files: set[str], manifests: list[str]) -> tuple[l
                         candidates |= python_candidates((folder / "src" / module_path).as_posix(), files)
                     entries.append({"kind": "project_script", "path": next(iter(candidates)) if len(candidates) == 1 else None,
                                     "target": value, "evidence": {"path": path, "key": f"project.scripts.{key}"}})
+                    line = manifest_line(text, key, value, toml=True)
+                    if line:
+                        entries[-1]["evidence"]["line"] = line
     return entries, configs, diagnostics
 
 
+def manifest_line(text: str, key: str, value: str, *, toml: bool = False) -> int | None:
+    section = None
+    matches = []
+    for index, line in enumerate(text.split("\n"), 1):
+        if toml:
+            header = re.fullmatch(r"\s*\[([^]]+)\]\s*(?:#.*)?", line)
+            if header:
+                section = header[1]
+            pattern = r"^\s*" + re.escape(key) + r"\s*=\s*(['\"])" + re.escape(value) + r"\1"
+            match = section == "project.scripts" and re.search(pattern, line)
+        else:
+            match = re.search(re.escape(json.dumps(key)) + r"\s*:\s*" + re.escape(json.dumps(value)), line)
+        if match:
+            matches.append(index)
+    return matches[0] if len(matches) == 1 else None
+
+
 def read_imports(source: str, output: Path, cache: Path, *, history_depth: int | None = None) -> dict:
+    return imports_from_snapshot(open_snapshot(source, output, cache), history_depth=history_depth)
+
+
+def entry_scope(entry: dict) -> dict:
+    evidence_path = entry["evidence"]["path"]
+    paths = [PurePosixPath(evidence_path), PurePosixPath(entry["path"] or evidence_path)]
+    for path in paths:
+        for index, part in enumerate(path.parts[:-1]):
+            kind = {"examples": "example", "example": "example", "demos": "example",
+                    "tests": "test", "test": "test"}.get(part.lower())
+            if kind:
+                end = min(index + 2, len(path.parts) - 1)
+                return {"kind": kind, "path": PurePosixPath(*path.parts[:end]).as_posix()}
+    if entry["kind"] == "python_main_guard":
+        return {"kind": "script", "path": entry["path"]}
+    if entry["kind"] == "python_main_module":
+        return {"kind": "package", "path": paths[1].parent.as_posix()}
+    if entry["kind"] in {"project_script", "package_json"}:
+        return {"kind": "package", "path": paths[0].parent.as_posix()}
+    return {"kind": "unknown", "path": None}
+
+
+def imports_from_snapshot(snapshot: Snapshot, *, history_depth: int | None = None,
+                          trees: dict | None = None) -> dict:
+    from .overview import configuration_overview
+
     parsers = make_parsers()
-    root = source_root(source, cache)
-    report = scan_root(root, source, output)
+    root, report = snapshot.root, snapshot.inventory
+    source = report["source"]
     files = {entry["path"] for entry in report["files"]}
-    entry_points, configs, diagnostics = manifest_facts(root, files, report["manifests"])
+    entry_points, configs, diagnostics = manifest_facts(snapshot, files, report["manifests"])
     edges, unresolved = [], []
     for path in sorted(files):
         suffix = PurePosixPath(path).suffix.lower()
@@ -276,9 +329,15 @@ def read_imports(source: str, output: Path, cache: Path, *, history_depth: int |
         if parser is None:
             continue
         python = suffix in PYTHON_EXTENSIONS
-        tree = parser.parse(read_project_file(root, path).encode())
+        try:
+            tree = parser.parse("\n".join(snapshot.lines(path)).encode())
+        except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+            diagnostics.append({"path": path, "reason": str(error)})
+            continue
         if tree.root_node.has_error:
             diagnostics.append({"path": path, "reason": "Tree-sitter found syntax errors."})
+        if trees is not None:
+            trees[path] = tree
         if PurePosixPath(path).name == "__main__.py":
             entry_points.append({"kind": "python_main_module", "path": path, "evidence": {"path": path, "line": 1}})
         for node in walk_nodes(tree.root_node):
@@ -310,11 +369,13 @@ def read_imports(source: str, output: Path, cache: Path, *, history_depth: int |
     facts = {
         "repo": report["repo"], "source": source, "commit": report["commit"],
         "edges": [{"id": f"imp:{index:04d}", **edge} for index, edge in enumerate(edges, 1)],
-        "entry_points": entry_points, "unresolved_imports": unresolved, "diagnostics": diagnostics,
+        "entry_points": [{**entry, "scope": entry_scope(entry)} for entry in entry_points],
+        "unresolved_imports": unresolved, "diagnostics": diagnostics,
+        "overview": configuration_overview(root, files, report["commit"], line_reader=snapshot.lines),
     }
     if history_depth is not None:
         from .history import read_history
 
-        local = Path(source).expanduser().is_dir()
+        local = snapshot.identity["cache"]["mode"] == "local"
         facts["history"] = read_history(root, report["commit"]["sha"], files, history_depth, not local)
     return facts

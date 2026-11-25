@@ -1,0 +1,36 @@
+.teaching-panel {
+  margin-top: 1rem;
+  padding: clamp(.7rem, 2.5vw, 1.65rem);
+  border: 1px solid #cbb0a5;
+  border-radius: .7rem 1.4rem 1.4rem;
+  background: #fbede0;
+}
+.teaching-panel[data-format="annotate"] { background: #ebedf5; border-color: #bbc0d1; }
+.teaching-panel[data-format="explore"] { background: #e3efe4; border-color: #b4c5b8; }
+.teaching-comparison { border-collapse: separate; border-spacing: .36rem; table-layout: fixed; width: 100%; }
+.teaching-comparison th, .teaching-comparison td { vertical-align: top; overflow-wrap: anywhere; }
+.teaching-comparison th { text-align: left; padding: .32rem; font-size: clamp(.78rem, 2vw, 1rem); }
+.teaching-comparison thead th:first-child { width: 22%; }
+.teaching-comparison thead th:not(:first-child) { color: #542e49; border-bottom: 2px solid #b991a9; }
+.learn .teaching-comparison button {
+  min-height: 3.2rem; height: 100%; width: 100%; text-align: left; line-height: 1.28;
+  font-size: clamp(.79rem, 2vw, 1rem); padding: .46rem;
+  font-weight: 620; overflow-wrap: anywhere; white-space: normal;
+}
+.teaching-selection { max-width: 66ch; margin: .8rem 0 .4rem; }
+.teaching-buttons { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .65rem; }
+.teaching-buttons button { max-width: 100%; overflow-wrap: anywhere; }
+.teaching-annotation { margin: .4rem 0; border: 1px solid #b1b3c6; border-radius: .55rem; background: #fafaff; }
+.teaching-annotation figcaption { padding: .47rem .55rem; border-bottom: 1px solid #d2d5df; }
+.learn .teaching-annotation pre { margin: 0; white-space: pre-wrap; padding: .22rem 0; font-size: .92rem; }
+.teaching-line { display: grid; grid-template-columns: 3rem minmax(0,1fr); padding: .18rem .35rem; min-height: 1.35rem; }
+.teaching-line > :first-child { color: #655779; text-align: right; padding-inline-end: .6rem; user-select: none; }
+.teaching-line[data-highlighted="true"] { background: #f8e5b5; box-shadow: inset 3px 0 #936b27; }
+.teaching-part { padding: .7rem .8rem; background: #fafffa; border: 1px solid #c0d3bf; border-radius: .55rem; margin-bottom: .6rem; }
+.teaching-part code { display: inline-block; background: #e5f0e5; padding: .3rem .5rem; border-radius: .35rem; }
+.teaching-part p { max-width: 65ch; margin: .5rem 0 0; }
+@media (max-width: 550px) {
+  .teaching-comparison { border-spacing: .17rem; }
+  .learn .teaching-comparison button { padding: .34rem .24rem; }
+  .teaching-line { grid-template-columns: 2rem minmax(0,1fr); }
+}
