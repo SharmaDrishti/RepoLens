@@ -45,7 +45,7 @@ class ScanError(Exception):
     """An error that can be shown directly in the terminal."""
 
 
-def clone_github(source: str, cache: Path) -> Path:
+def clone_github(source: str, cache: Path, *, cache_info: dict | None = None) -> Path:
     try:
         url = urlsplit(source)
         match = re.fullmatch(r"/([A-Za-z0-9-]+)/([A-Za-z0-9_.-]+)/?", url.path)
@@ -66,6 +66,8 @@ def clone_github(source: str, cache: Path) -> Path:
     key = hashlib.sha256(canonical.lower().encode()).hexdigest()
     checkout = cache / key / repo
     if checkout.is_dir():
+        if cache_info is not None:
+            cache_info["reused"] = True
         return checkout
 
     checkout.parent.mkdir(parents=True, exist_ok=True)
@@ -93,6 +95,8 @@ def clone_github(source: str, cache: Path) -> Path:
         except OSError:
             if not checkout.is_dir():
                 raise
+            if cache_info is not None:
+                cache_info["reused"] = True
     return checkout
 
 
@@ -183,12 +187,12 @@ def inspect_file(path: Path, root: Path, output: Path) -> tuple[dict | None, str
     }, None
 
 
-def source_root(source: str, cache: Path) -> Path:
+def source_root(source: str, cache: Path, *, cache_info: dict | None = None) -> Path:
     local = Path(source).expanduser()
     if local.is_dir():
         return local.resolve()
     if "://" in source or source.lower().startswith(("github.com/", "git@")):
-        return clone_github(source, cache)
+        return clone_github(source, cache, cache_info=cache_info)
     raise ScanError(f"Folder not found: {source}")
 
 
@@ -196,7 +200,7 @@ def scan(source: str, output: Path, cache: Path) -> dict:
     return scan_root(source_root(source, cache), source, output)
 
 
-def scan_root(root: Path, source: str, output: Path) -> dict:
+def scan_root(root: Path, source: str, output: Path, *, allowed: set[str] | None = None) -> dict:
     output = output.resolve()
     skipped = dict.fromkeys(SKIP_REASONS, 0)
     files = []
@@ -217,6 +221,9 @@ def scan_root(root: Path, source: str, output: Path) -> dict:
             folders.remove(folder)
         for name in names:
             path = Path(directory) / name
+            if allowed is not None and path.relative_to(root).as_posix() not in allowed:
+                skipped["git_ignored"] = skipped.get("git_ignored", 0) + 1
+                continue
             entry, reason = inspect_file(path, root, output)
             # Even a large or unreadable manifest can be an entry-point clue.
             if name in MANIFEST_NAMES and reason in {None, "too_large", "unreadable", "binary"}:

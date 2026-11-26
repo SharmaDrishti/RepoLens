@@ -7,8 +7,8 @@ from .checker import MAX_CLAIMS, SECTIONS, build_evidence, check_draft
 from .providers import PROVIDERS
 from .scanner import ScanError, source_root
 
-def assemble_report(facts: dict, root: Path, draft) -> dict:
-    evidence, diagnostics = build_evidence(facts, root.resolve())
+def assemble_report(facts: dict, root: Path, draft, *, line_reader=None) -> dict:
+    evidence, diagnostics = build_evidence(facts, root.resolve(), line_reader=line_reader)
     guide = facts.get("reading_guide", {})
     claims, log = [], []
     if evidence:
@@ -48,11 +48,24 @@ def assemble_report(facts: dict, root: Path, draft) -> dict:
     return {
         "repo": facts["repo"], "source": facts["source"], "commit": facts["commit"],
         "claims": accepted_claims, "sections": sections, "reading_guide": guide,
+        "overview": facts.get("overview", {}),
         "rejected_claims": log, "evidence_diagnostics": diagnostics,
     }
 
 
 def write_report(facts_path: Path, cache: Path, model: str | None, *, provider_name: str = "claude") -> dict:
+    try:
+        facts = json.loads(facts_path.read_text(encoding="utf-8"))
+        return report_from_facts(facts, cache, model, provider_name)
+    except (ValueError, KeyError, TypeError) as error:
+        raise ScanError(f"Invalid facts file: {error}") from error
+
+
+def report_from_facts(facts: dict, cache: Path, model: str | None, provider_name: str | None, *,
+                      root: Path | None = None, line_reader=None) -> dict:
+    root = root or source_root(facts["source"], cache)
+    if provider_name is None:
+        return assemble_report(facts, root, measured_draft, line_reader=line_reader)
     provider = None
 
     def draft(payload, reasons):
@@ -61,9 +74,15 @@ def write_report(facts_path: Path, cache: Path, model: str | None, *, provider_n
             provider = PROVIDERS[provider_name](model)
         return provider(payload, reasons)
 
-    try:
-        facts = json.loads(facts_path.read_text(encoding="utf-8"))
-        root = source_root(facts["source"], cache)
-        return assemble_report(facts, root, draft)
-    except (ValueError, KeyError, TypeError) as error:
-        raise ScanError(f"Invalid facts file: {error}") from error
+    return assemble_report(facts, root, draft, line_reader=line_reader)
+
+
+def measured_draft(payload: dict, rejections: list) -> dict:
+    """Use measured wording directly when running without a provider."""
+    if rejections:
+        return {"claims": []}
+    return {"claims": [
+        {"kind": "FACT", "text": item["fact_text"], "evidence_ids": [item["id"]],
+         "section": "summary" if index == 0 else "architecture"}
+        for index, item in enumerate(payload["evidence"][:5])
+    ]}

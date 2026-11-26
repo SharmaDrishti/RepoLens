@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "repolens"
 version = "0.1.0"
@@ -17,3 +21,9 @@ imports = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.setuptools.packages.find]
+include = ["repolens*"]
+
+[tool.setuptools.package-data]
+repolens = ["page_template.html"]

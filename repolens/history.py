@@ -92,6 +92,8 @@ def read_history(root: Path, sha: str | None, files: set[str], depth: int, allow
         result["commits_analyzed"] += 1
         touched = sorted(files & paths)
         changes.update(touched)
+        if timestamp.endswith("Z"):
+            timestamp = timestamp[:-1] + "+00:00"
         date = datetime.fromisoformat(timestamp)
         for path in touched:
             if path not in last_changed or date > last_changed[path][0]:

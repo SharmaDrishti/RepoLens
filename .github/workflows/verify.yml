@@ -1,0 +1,46 @@
+name: Verify and build a demo
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install '.[imports,test]'
+      - run: python -m pytest -q
+      - run: python -m repolens build . --no-ai --history --out report.html
+      - uses: actions/upload-artifact@v4
+        with:
+          name: repolens-demo
+          path: report.html
+          if-no-files-found: error
+
+  browser:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install '.[imports]' 'playwright==1.64.1'
+      - run: python -m playwright install --with-deps "${{ matrix.browser }}"
+      - run: python tests/browser_check.py --browser "${{ matrix.browser }}"

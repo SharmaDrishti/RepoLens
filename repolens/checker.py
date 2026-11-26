@@ -18,6 +18,15 @@ GITHUB_ORIGIN = re.compile(
 EDGE_VERBS = {"import": "imports", "reexport": "re-exports from", "dynamic_import": "dynamically imports"}
 
 
+def source_url(commit: dict, path: str, line: int, end: int | None = None) -> str | None:
+    sha = commit.get("sha")
+    origin = GITHUB_ORIGIN.fullmatch(commit.get("remote_url") or "")
+    if not commit.get("pinned") or not origin or not isinstance(sha, str) or not SHA.fullmatch(sha):
+        return None
+    anchor = f"L{line}" if end is None or end == line else f"L{line}-L{end}"
+    return f"https://github.com/{origin[1]}/blob/{sha}/{quote(path)}#{anchor}"
+
+
 def source_lines(root: Path, path: str, sha: str | None) -> list[str]:
     relative = PurePosixPath(path)
     candidate = root / relative
@@ -40,7 +49,7 @@ def source_lines(root: Path, path: str, sha: str | None) -> list[str]:
     return text.split("\n") if text else []
 
 
-def candidate_evidence(facts: dict):
+def candidate_evidence(facts: dict, edge_ids: list[str] | None = None):
     guide = facts.get("reading_guide", {})
     flow = (guide.get("flow") or {}).get("edge_ids", [])
     recommendations = [
@@ -48,13 +57,17 @@ def candidate_evidence(facts: dict):
         if "edge_id" in item["evidence"]
     ]
     by_id = {edge["id"]: edge for edge in facts["edges"]}
-    for identifier in dict.fromkeys([*flow, *recommendations, *by_id]):
+    order = edge_ids if edge_ids is not None else [*flow, *recommendations, *by_id]
+    for identifier in dict.fromkeys(order):
         if identifier not in by_id:
             continue
         edge = by_id[identifier]
         if edge["kind"] in EDGE_VERBS:
             text = f"{edge['from']} {EDGE_VERBS[edge['kind']]} {edge['to']}."
             yield identifier, text, edge["from"], edge["line"], edge["to"]
+
+    if edge_ids is not None:
+        return
 
     for index, entry in enumerate(facts["entry_points"], 1):
         evidence = entry["evidence"]
@@ -69,19 +82,19 @@ def candidate_evidence(facts: dict):
             yield f"entry:{index:04d}", text, evidence["path"], evidence["line"], entry["path"]
 
 
-def build_evidence(facts: dict, root: Path) -> tuple[dict, list]:
+def build_evidence(facts: dict, root: Path, *, edge_ids: list[str] | None = None, line_reader=None) -> tuple[dict, list]:
+    root = root.resolve()
     commit = facts["commit"]
     sha = commit["sha"] if commit["pinned"] else None
     if commit["pinned"] and (not isinstance(sha, str) or not SHA.fullmatch(sha)):
         raise ScanError("The facts file has an invalid pinned commit SHA.")
-    origin = GITHUB_ORIGIN.fullmatch(commit.get("remote_url") or "")
     evidence, diagnostics, files = {}, [], {}
-    for identifier, text, path, line, target in candidate_evidence(facts):
+    for identifier, text, path, line, target in candidate_evidence(facts, edge_ids):
         try:
             for name in (path, target):
                 if name not in files:
                     try:
-                        files[name] = source_lines(root, name, sha)
+                        files[name] = line_reader(name) if line_reader is not None else source_lines(root, name, sha)
                     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
                         files[name] = error
                 if isinstance(files[name], Exception):
@@ -92,10 +105,9 @@ def build_evidence(facts: dict, root: Path) -> tuple[dict, list]:
         except (OSError, ValueError, subprocess.TimeoutExpired) as error:
             diagnostics.append({"evidence_id": identifier, "reason": str(error)})
             continue
-        url = f"https://github.com/{origin[1]}/blob/{sha}/{quote(path)}#L{line}" if origin and sha else None
         evidence[identifier] = {
             "id": identifier, "fact_text": text, "path": path, "line": line,
-            "snippet": lines[line - 1].strip()[:240], "url": url,
+            "snippet": lines[line - 1].strip()[:240], "url": source_url(commit, path, line),
         }
         if len(evidence) == MAX_EVIDENCE:
             break

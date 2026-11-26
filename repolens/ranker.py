@@ -23,6 +23,8 @@ def entry_reason(entry: dict) -> str:
     if kind == "package_json":
         return f"package.json names this file in its {key} entry."
     if kind == "project_script":
+        if entry.get("scope", {}).get("kind") == "example":
+            return f"The example's pyproject.toml points to this file in {key}."
         return f"pyproject.toml points to this file in {key}."
     if kind == "python_main_module":
         return "This is a __main__.py file, a Python entry point for a package or runnable directory."
@@ -71,6 +73,7 @@ def build_reading_guide(facts: dict) -> dict:
             "files": [start, *(edge["to"] for edge in steps)],
             "edge_ids": [edge["id"] for edge in steps],
             "entry_evidence": entries[0]["evidence"],
+            "entry_scope": entries[0].get("scope", {"kind": "unknown", "path": None}),
         }
 
     recommendations = {}

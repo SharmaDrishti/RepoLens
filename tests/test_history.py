@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 import subprocess
 
+from repolens import history as history_reader
 from repolens.history import read_history
 from repolens.imports import read_imports
 
@@ -78,3 +79,18 @@ def test_history_without_git(tmp_path):
     assert result["status"] == "unavailable"
     assert result["files"] == []
     assert result["diagnostics"]
+
+
+def test_history_normalizes_git_utc_z_suffix(tmp_path, monkeypatch):
+    monkeypatch.setattr(history_reader, "shallow_boundaries", lambda root: set())
+    monkeypatch.setattr(history_reader, "log_records", lambda root, sha, depth: iter([
+        ("commit-a", "2025-01-02T12:00:00Z", {"a.py"}),
+        ("commit-b", "2025-01-01T13:00:00+01:00", {"a.py", "b.py"}),
+    ]))
+
+    result = read_history(tmp_path, "commit-a", {"a.py", "b.py"}, 10, False)
+
+    assert result["files"] == [
+        {"path": "a.py", "change_count": 2, "last_changed": "2025-01-02T12:00:00+00:00"},
+        {"path": "b.py", "change_count": 1, "last_changed": "2025-01-01T13:00:00+01:00"},
+    ]
