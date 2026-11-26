@@ -1,5 +1,13 @@
 # RepoLens
 
+The owner's visual-explainer master brief supersedes the earlier product
+scope in this file. Its first step can be run with
+`python -m repolens context <repo> --out <directory>`. The command produces
+`purpose.json`, `usecases.json`, and `getstarted.json` for review.
+The unified build uses the same snapshot and readers and can export its
+embedded model with `--knowledge-out knowledge.json`. See
+[repository knowledge v1](docs/knowledge-model.md).
+
 RepoLens is a command-line tool that turns a GitHub repository into one
 animated HTML page. The page explains what the project does, how its parts
 connect, and which files a newcomer should read first.
@@ -33,7 +41,9 @@ entry point and trace one important flow in five minutes.
 6. Check factual claims against the measured data.
 7. Build a single animated HTML report with React and Vite.
 
-Phases 1 through 4 are committed. Phase 5 has been verified and is awaiting commit.
+Phases 1 through 5 are committed. The Phase 6 page and Phase 7 build command
+are ready for functional review. Final visual design and browser review are
+deferred.
 
 To add history to the facts report, run
 `python -m repolens imports <source> --history --out facts.json`.
@@ -68,3 +78,23 @@ The Phase 5 live Gemini review covered itsdangerous (`672971d`), Click
 The saved reports contained 15 factual claims and six labeled interpretations.
 The factual claims matched the cited source. These runs logged no rejections.
 Separate tests exercise invented claims and invalid evidence.
+
+To generate the offline page, run
+`python -m repolens page report.json --facts facts.json --out report.html`.
+The facts file is optional and adds more import connections and any measured
+Git history. Open the resulting HTML in a browser. It includes its own styles,
+JavaScript, and report data. GitHub source links can be opened when online.
+
+To rebuild the bundled template after changing the frontend, run
+`npm install` and `npm run build` inside `web/`. The build updates
+`repolens/page_template.html`, which ships with the Python package.
+
+Use `python -m repolens build <repo> --no-ai --out report.html` for a one-command
+report from measured facts. Omit `--no-ai` to use Gemini, or select Claude with
+`--provider claude`. Add `--history` to include Git history. The GitHub Actions
+workflow runs the tests and builds a downloadable demo without AI credentials.
+
+Reports can now lead with a cited excerpt of the repository README and show
+Python commands named in Claude Code hook settings or templates. Documentation
+and hook configuration are displayed as their own evidence. The import map
+appears when the report has import connections to draw.
